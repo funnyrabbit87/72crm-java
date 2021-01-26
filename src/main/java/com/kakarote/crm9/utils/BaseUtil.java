@@ -10,6 +10,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Set;
 
 public class BaseUtil {
 
@@ -99,30 +100,36 @@ public class BaseUtil {
     }
 
     public static void userExit(Long userId,Integer type){
-        Redis redis = RedisManager.getRedis();
         if(type==null||type==1){
-            if(redis.exists(USER_ADMIN_TOKEN+userId)){
-                String token=redis.get(USER_ADMIN_TOKEN+userId);
-                redis.del(USER_ADMIN_TOKEN+userId);
-                redis.del(token);
-            }
+            rmAllToken(USER_ADMIN_TOKEN+userId);
         }
         if(type==null||type==2){
-            if(redis.exists(USER_MOBILE_TOKEN+userId)){
-                String token=redis.get(USER_MOBILE_TOKEN+userId);
-                redis.del(USER_MOBILE_TOKEN+userId);
-                redis.del(token);
-            }
+            rmAllToken(USER_MOBILE_TOKEN+userId);
         }
     }
+
+    private static void rmAllToken(String prefix){
+        Redis redis = RedisManager.getRedis();
+        Set<String> keys=redis.keys(prefix+"*");
+        if(keys!=null&&keys.size()>0){
+            keys.stream().forEach(oneKey->{
+                if(redis.exists(oneKey)){
+                    String token=redis.get(oneKey);
+                    redis.del(oneKey);
+                    redis.del(token);
+                }
+            });
+        }
+    }
+
     public static void setToken(Long userId,String token,Integer type){
-        userExit(userId,type);
+        //userExit(userId,type);
         Redis redis = RedisManager.getRedis();
         if(redis.exists(token)){
             if(type==1){
-                redis.setex(USER_ADMIN_TOKEN+userId,redis.ttl(token).intValue(),token);
+                redis.setex(USER_ADMIN_TOKEN+userId+token,redis.ttl(token).intValue(),token);
             }else if(type==2){
-                redis.setex(USER_MOBILE_TOKEN+userId,redis.ttl(token).intValue(),token);
+                redis.setex(USER_MOBILE_TOKEN+userId+token,redis.ttl(token).intValue(),token);
             }
         }
 
@@ -131,8 +138,8 @@ public class BaseUtil {
         Redis redis = RedisManager.getRedis();
         if(redis.exists(token)){
             redis.expire(token,3600);
-            redis.expire(USER_ADMIN_TOKEN+getUserId(),3600);
-            redis.expire(USER_MOBILE_TOKEN+getUserId(),3600);
+            redis.expire(USER_ADMIN_TOKEN+getUserId()+token,3600);
+            redis.expire(USER_MOBILE_TOKEN+getUserId()+token,3600);
         }
     }
 
